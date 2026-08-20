@@ -53,9 +53,12 @@ class SharedPreferencesSettingsRepository implements SettingsRepository {
   }
 }
 
-String? validateWebSocketUrl(String value) {
-  final uri = Uri.tryParse(value.trim());
-  if (uri == null || !uri.hasAuthority || (uri.scheme != 'ws' && uri.scheme != 'wss')) {
+String? validateWebSocketUrl(String? value) {
+  final trimmedValue = value?.trim() ?? '';
+  final uri = Uri.tryParse(trimmedValue);
+  if (uri == null ||
+      uri.host.isEmpty ||
+      (uri.scheme != 'ws' && uri.scheme != 'wss')) {
     return 'Enter a valid ws:// or wss:// address.';
   }
   return null;

@@ -210,7 +210,7 @@ class _ChatScreenState extends State<ChatScreen> {
                 : ListView.separated(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     itemCount: _messages.length,
-                    separatorBuilder: (_, _) => const Divider(height: 1),
+                    separatorBuilder: (context, index) => const Divider(height: 1),
                     itemBuilder: (context, index) {
                       final message = _messages[index];
                       final time = TimeOfDay.fromDateTime(message.receivedAt);

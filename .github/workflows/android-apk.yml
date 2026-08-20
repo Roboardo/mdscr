@@ -23,14 +23,14 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Generate Android project
-        run: flutter create --platforms=android .
-
       - name: Install dependencies
         run: flutter pub get
 
       - name: Run tests
         run: flutter test
+
+      - name: Generate Android project
+        run: flutter create --platforms=android .
 
       - name: Build debug APK
         run: flutter build apk --debug
