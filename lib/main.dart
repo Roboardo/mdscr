@@ -5,6 +5,7 @@ import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'options_screen.dart';
 import 'settings.dart';
+import 'signal_dictionary.dart';
 
 void main() {
   runApp(const SignalChatApp());
@@ -30,9 +31,12 @@ class SignalChatApp extends StatelessWidget {
 enum ConnectionStatus { connecting, connected, disconnected, error }
 
 class ChatMessage {
-  const ChatMessage({required this.value, required this.receivedAt});
+  const ChatMessage({
+    required this.rawValue,
+    required this.receivedAt,
+  });
 
-  final String value;
+  final String rawValue;
   final DateTime receivedAt;
 }
 
@@ -92,7 +96,7 @@ class _ChatScreenState extends State<ChatScreen> {
         if (mounted) {
           setState(() {
             _messages.add(ChatMessage(
-              value: frame.toString(),
+              rawValue: frame.toString(),
               receivedAt: DateTime.now(),
             ));
           });
@@ -212,8 +216,13 @@ class _ChatScreenState extends State<ChatScreen> {
                       final time = TimeOfDay.fromDateTime(message.receivedAt);
                       return ListTile(
                         leading: const CircleAvatar(child: Icon(Icons.waves)),
-                        title: SelectableText(message.value),
-                        subtitle: Text(time.format(context)),
+                        title: SelectableText(
+                          translateSignalFrame(
+                            message.rawValue,
+                            settings?.dictionary ?? const SignalDictionary.empty(),
+                          ),
+                        ),
+                        subtitle: Text('${time.format(context)}  ${message.rawValue}'),
                       );
                     },
                   ),
