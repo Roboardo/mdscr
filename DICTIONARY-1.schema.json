@@ -32,7 +32,8 @@
       }
     },
     "id": {
-      "type": "integer"
+      "type": "number",
+      "multipleOf": 1
     },
     "beforeUserDefaultMode": {
       "$ref": "#/$defs/formatMode"
@@ -45,7 +46,8 @@
     "keys": {
       "type": "array",
       "items": {
-        "type": "integer"
+        "type": "number",
+        "multipleOf": 1
       }
     },
     "stringDictionary": {
@@ -65,7 +67,8 @@
       }
     },
     "formatMode": {
-      "type": "integer",
+      "type": "number",
+      "multipleOf": 1,
       "enum": [0, 1, 2, 3]
     },
     "description": {

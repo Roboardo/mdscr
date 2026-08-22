@@ -986,9 +986,9 @@ class _MessageListState extends State<_MessageList>
                     for (var index = 0; index < displayedSignals.length; index++) ...[
                       if (index > 0)
                         TextSpan(
-                          text: widget.dictionary?.separatorBetween(
-                                displayedSignals[index - 1],
-                                displayedSignals[index],
+                          text: widget.dictionary?.separatorBeforeSignal(
+                                displayedSignals,
+                                index,
                               ) ??
                               ' ',
                         ),

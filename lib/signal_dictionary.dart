@@ -394,13 +394,29 @@ class SignalDictionary {
     final buffer = StringBuffer(displayTextForSignal(values.first));
     for (var index = 1; index < values.length; index++) {
       buffer
-        ..write(separatorBetween(values[index - 1], values[index]))
+        ..write(separatorBeforeSignal(values, index))
         ..write(displayTextForSignal(values[index]));
     }
     return buffer.toString();
   }
 
+  String separatorBeforeSignal(List<int> signals, int index) {
+    if (index < 1 || index >= signals.length) {
+      throw RangeError.index(index, signals, 'index');
+    }
+    final breakAfterDouble = index >= 2 &&
+        signals[index - 2] == signals[index - 1] &&
+        signals[index - 1] < 0 &&
+        descriptions[signals[index - 1]]?.breakOnDouble == true;
+    return breakAfterDouble
+        ? _separatorFor(SignalFormatMode.lineBreak)
+        : separatorBetween(signals[index - 1], signals[index]);
+  }
+
   String separatorBetween(int firstSignal, int secondSignal) {
+    if (firstSignal > 0 && secondSignal > 0) {
+      return ' ';
+    }
     final before = secondSignal >= 0
       ? SignalFormatMode.none
       : descriptions[secondSignal]?.formatMode ?? beforeUserDefaultMode;
