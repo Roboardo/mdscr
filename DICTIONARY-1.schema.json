@@ -1,0 +1,96 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mdscr.local/schemas/dictionary-save.schema.json",
+  "title": "MDSCR Dictionary Save",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "wordDict",
+    "descDict",
+    "id",
+    "beforeUserDefaultMode",
+    "afterUserDefaultMode"
+  ],
+  "properties": {
+    "wordDict": {
+      "$ref": "#/$defs/stringDictionary"
+    },
+    "descDict": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["keys", "values"],
+      "properties": {
+        "keys": {
+          "$ref": "#/$defs/keys"
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/description"
+          }
+        }
+      }
+    },
+    "id": {
+      "type": "integer"
+    },
+    "beforeUserDefaultMode": {
+      "$ref": "#/$defs/formatMode"
+    },
+    "afterUserDefaultMode": {
+      "$ref": "#/$defs/formatMode"
+    }
+  },
+  "$defs": {
+    "keys": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      }
+    },
+    "stringDictionary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["keys", "values"],
+      "properties": {
+        "keys": {
+          "$ref": "#/$defs/keys"
+        },
+        "values": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "formatMode": {
+      "type": "integer",
+      "enum": [0, 1, 2, 3]
+    },
+    "description": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "desc",
+        "formatMode",
+        "formatModeAfter",
+        "breakOnDouble"
+      ],
+      "properties": {
+        "desc": {
+          "type": "string"
+        },
+        "formatMode": {
+          "$ref": "#/$defs/formatMode"
+        },
+        "formatModeAfter": {
+          "$ref": "#/$defs/formatMode"
+        },
+        "breakOnDouble": {
+          "type": "boolean"
+        }
+      }
+    }
+  }
+}
