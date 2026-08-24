@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:web_socket_channel/web_socket_channel.dart';
 
 import 'conversation_log.dart';
+import 'dictionary_screen.dart';
 import 'graphic_message.dart';
 import 'music_message.dart';
 import 'options_screen.dart';
@@ -654,6 +655,24 @@ class _ChatScreenState extends State<ChatScreen>
     }
   }
 
+  Future<void> _openDictionary() async {
+    final settings = _settings;
+    if (settings == null) {
+      return;
+    }
+    final updatedSettings = await Navigator.of(context).push<AppSettings>(
+      MaterialPageRoute(
+        builder: (_) => DictionaryScreen(
+          settings: settings,
+          settingsRepository: _settingsRepository,
+        ),
+      ),
+    );
+    if (updatedSettings != null && mounted) {
+      setState(() => _settings = updatedSettings);
+    }
+  }
+
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
@@ -686,6 +705,11 @@ class _ChatScreenState extends State<ChatScreen>
               icon: const Icon(Icons.refresh),
               tooltip: 'RECONNECT',
               onPressed: settings == null ? null : _connect,
+            ),
+            IconButton(
+              icon: const Icon(Icons.menu_book_outlined),
+              tooltip: 'DICTIONARY',
+              onPressed: settings == null ? null : _openDictionary,
             ),
             IconButton(
               icon: const Icon(Icons.settings_outlined),

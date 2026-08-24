@@ -458,6 +458,19 @@ class SignalDictionary {
     );
   }
 
+  SignalDictionary withoutEntry(int signal) {
+    final updatedEntries = Map<int, String>.of(entries)..remove(signal);
+    final updatedDescriptions = Map<int, SignalDescription>.of(descriptions)
+      ..remove(signal);
+    return SignalDictionary(
+      Map.unmodifiable(updatedEntries),
+      descriptions: Map.unmodifiable(updatedDescriptions),
+      id: id,
+      beforeUserDefaultMode: beforeUserDefaultMode,
+      afterUserDefaultMode: afterUserDefaultMode,
+    );
+  }
+
   SignalDictionary withMissingEntriesFrom(SignalDictionary dictionary) {
     final updatedEntries = Map<int, String>.of(entries);
     final updatedDescriptions = Map<int, SignalDescription>.of(descriptions);

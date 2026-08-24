@@ -124,6 +124,7 @@ void main() {
         dictionary.withEntry(-3, 'new word').entries,
         {-1: 'A', -2: 'WORD', -3: 'NEW WORD'},
       );
+      expect(dictionary.withoutEntry(-1).entries, {-2: 'WORD'});
       final matches = dictionary.matchingEntries('wo');
       expect(matches, hasLength(1));
       expect(matches.single.key, -2);
