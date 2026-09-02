@@ -61,10 +61,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
   }
 
   Future<void> _addEntry() async {
-    final nextSignal = _dictionary.entries.keys.isEmpty
-        ? -1
-        : _dictionary.entries.keys.reduce((a, b) => a < b ? a : b) - 1;
-    await _editEntry(nextSignal);
+    await _editEntry();
   }
 
   void _startSearch() {
@@ -79,13 +76,19 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     setState(() => _searchQuery = '');
   }
 
-  Future<void> _editEntry(int signal) async {
-    final existingDescription = _dictionary.descriptions[signal];
+  Future<void> _editEntry([int? signal]) async {
+    final isNewEntry = signal == null;
+    final defaultSignal = _dictionary.entries.keys.isEmpty
+        ? -1
+        : _dictionary.entries.keys.reduce((a, b) => a < b ? a : b) - 1;
+    final entrySignal = signal ?? defaultSignal;
+    final existingDescription = _dictionary.descriptions[entrySignal];
+    final signalController = TextEditingController(text: entrySignal.toString());
     final valueController = TextEditingController(
-      text: _dictionary.entries[signal] ?? '',
+      text: _dictionary.entries[entrySignal] ?? '',
     );
     final descriptionController = TextEditingController(
-      text: existingDescription?.desc ?? _dictionary.entries[signal] ?? '',
+      text: existingDescription?.desc ?? _dictionary.entries[entrySignal] ?? '',
     );
     final update = await showDialog<_DictionaryEntryUpdate>(
       context: context,
@@ -95,20 +98,34 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
         var formatModeAfter = existingDescription?.formatModeAfter ??
             _dictionary.afterUserDefaultMode;
         var breakOnDouble = existingDescription?.breakOnDouble ?? false;
+        String? signalError;
         return StatefulBuilder(
           builder: (context, setDialogState) => AlertDialog(
             title: Text(
-              _dictionary.entries.containsKey(signal)
-                  ? 'EDIT $signal'
-                  : 'ADD $signal',
+              isNewEntry ? 'ADD ENTRY' : 'EDIT $entrySignal',
             ),
             content: SingleChildScrollView(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  if (isNewEntry) ...[
+                    TextField(
+                      controller: signalController,
+                      autofocus: true,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        signed: true,
+                      ),
+                      decoration: InputDecoration(
+                        border: const OutlineInputBorder(),
+                        labelText: 'NUMBER',
+                        errorText: signalError,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   TextField(
                     controller: valueController,
-                    autofocus: true,
+                    autofocus: !isNewEntry,
                     textCapitalization: TextCapitalization.characters,
                     inputFormatters: [
                       TextInputFormatter.withFunction(
@@ -169,16 +186,32 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                 child: const Text('CANCEL'),
               ),
               FilledButton(
-                onPressed: () => Navigator.pop(
-                  context,
-                  _DictionaryEntryUpdate(
-                    value: valueController.text,
-                    description: descriptionController.text,
-                    formatMode: formatMode,
-                    formatModeAfter: formatModeAfter,
-                    breakOnDouble: breakOnDouble,
-                  ),
-                ),
+                onPressed: () {
+                  final updatedSignal = int.tryParse(signalController.text);
+                  if (updatedSignal == null || updatedSignal >= 0) {
+                    setDialogState(
+                      () => signalError = 'ENTER A NEGATIVE NUMBER',
+                    );
+                    return;
+                  }
+                  if (isNewEntry && _dictionary.entries.containsKey(updatedSignal)) {
+                    setDialogState(
+                      () => signalError = 'NUMBER ALREADY EXISTS',
+                    );
+                    return;
+                  }
+                  Navigator.pop(
+                    context,
+                    _DictionaryEntryUpdate(
+                      signal: updatedSignal,
+                      value: valueController.text,
+                      description: descriptionController.text,
+                      formatMode: formatMode,
+                      formatModeAfter: formatModeAfter,
+                      breakOnDouble: breakOnDouble,
+                    ),
+                  );
+                },
                 child: const Text('SAVE'),
               ),
             ],
@@ -186,6 +219,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
         );
       },
     );
+    signalController.dispose();
     valueController.dispose();
     descriptionController.dispose();
 
@@ -194,7 +228,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
     }
     await _saveDictionary(
       _dictionary.withEntry(
-        signal,
+        update.signal,
         update.value.trim(),
         description: update.description.trim(),
         formatMode: update.formatMode,
@@ -319,6 +353,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
 
 class _DictionaryEntryUpdate {
   const _DictionaryEntryUpdate({
+    required this.signal,
     required this.value,
     required this.description,
     required this.formatMode,
@@ -326,6 +361,7 @@ class _DictionaryEntryUpdate {
     required this.breakOnDouble,
   });
 
+  final int signal;
   final String value;
   final String description;
   final SignalFormatMode formatMode;
