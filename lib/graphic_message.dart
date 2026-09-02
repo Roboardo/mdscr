@@ -1,4 +1,5 @@
 import 'dart:math' as math;
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 
@@ -179,26 +180,115 @@ class _GraphicScenePainter extends CustomPainter {
       }
     }
 
-    final ordered = [...spheres]
-      ..sort(
-        (a, b) => _cameraCoordinates(a).depth.compareTo(
-          _cameraCoordinates(b).depth,
-        ),
-      );
-    for (final sphere in ordered) {
-      final projection = _project(sphere, size);
-        final sceneScale = _sceneScale(size);
-      final radius = math.max(
-        2.0,
-          sphere.radius * projection.scale * sceneScale * 36 / 42,
-      );
-      final color = _colorFor(sphere.color);
-      canvas.drawCircle(
-        projection.point,
-        radius,
-          Paint()..color = color,
+    _paintRayTracedSpheres(canvas, size);
+  }
+
+  void _paintRayTracedSpheres(Canvas canvas, Size size) {
+    const cameraDistance = 18.5;
+    final scale = _sceneScale(size) * zoom;
+    final sampleSize = drawGrid ? 3.0 : 2.0;
+    final samplesByColor = <Color, List<Offset>>{};
+    final cameraSpheres = spheres
+        .map(
+          (sphere) => (
+            center: _cameraCoordinates(sphere),
+            radius: sphere.radius,
+            color: _colorFor(sphere.color),
+          ),
+        )
+        .toList();
+
+    for (var screenY = 0.0; screenY < size.height; screenY += sampleSize) {
+      for (var screenX = 0.0; screenX < size.width; screenX += sampleSize) {
+        final rayX = (screenX - size.width / 2) / scale;
+        final rayZ = -(screenY - size.height / 2) / scale;
+        final rayLength = math.sqrt(
+          rayX * rayX + rayZ * rayZ + cameraDistance * cameraDistance,
+        );
+        final direction = (
+          x: rayX / rayLength,
+          z: rayZ / rayLength,
+          depth: -cameraDistance / rayLength,
+        );
+        _RayHit? closestHit;
+        for (final sphere in cameraSpheres) {
+          final hit = _intersectRaySphere(direction, sphere.center, sphere.radius);
+          if (hit != null && (closestHit == null || hit.distance < closestHit.distance)) {
+            closestHit = _RayHit(
+              distance: hit.distance,
+              normal: hit.normal,
+              color: sphere.color,
+            );
+          }
+        }
+        if (closestHit != null) {
+          final color = _shadeSurface(closestHit.color, closestHit.normal);
+          samplesByColor.putIfAbsent(color, () => []).add(
+            Offset(screenX + sampleSize / 2, screenY + sampleSize / 2),
+          );
+        }
+      }
+    }
+    for (final entry in samplesByColor.entries) {
+      canvas.drawPoints(
+        ui.PointMode.points,
+        entry.value,
+        Paint()
+          ..color = entry.key
+          ..strokeWidth = sampleSize + .5
+          ..strokeCap = StrokeCap.square,
       );
     }
+  }
+
+  ({double distance, ({double x, double z, double depth}) normal})?
+      _intersectRaySphere(
+    ({double x, double z, double depth}) direction,
+    ({double x, double z, double depth}) center,
+    double radius,
+  ) {
+    final relativeDepth = center.depth - 18.5;
+    final projection = center.x * direction.x +
+      center.z * direction.z +
+      relativeDepth * direction.depth;
+    final centerDistanceSquared = center.x * center.x +
+      center.z * center.z +
+      relativeDepth * relativeDepth;
+    final perpendicularDistanceSquared =
+        centerDistanceSquared - projection * projection;
+    final radiusSquared = radius * radius;
+    if (perpendicularDistanceSquared > radiusSquared) {
+      return null;
+    }
+    final distance = projection - math.sqrt(radiusSquared - perpendicularDistanceSquared);
+    if (distance <= 0) {
+      return null;
+    }
+    return (
+      distance: distance,
+      normal: (
+        x: (direction.x * distance - center.x) / radius,
+        z: (direction.z * distance - center.z) / radius,
+        depth: (direction.depth * distance - relativeDepth) / radius,
+      ),
+    );
+  }
+
+  Color _shadeSurface(
+    Color color,
+    ({double x, double z, double depth}) normal,
+  ) {
+    const lightX = -.45;
+    const lightZ = .55;
+    const lightDepth = 1.0;
+    const lightLength = 1.237;
+    final diffuse = math.max(
+      0.0,
+      (normal.x * lightX + normal.z * lightZ + normal.depth * lightDepth) /
+          lightLength,
+    );
+    final brightness = .16 + diffuse * .84;
+    return Color.lerp(Colors.black, color, brightness)!.withValues(alpha: 1);
   }
 
   ({Offset point, double scale}) _project(GraphicSphere sphere, Size size) {
@@ -206,17 +296,16 @@ class _GraphicScenePainter extends CustomPainter {
     final coordinates = _cameraCoordinates(sphere);
     final depth = math.max(2.0, cameraDistance - coordinates.depth);
     final scale = cameraDistance / depth * zoom;
-      final sceneScale = _sceneScale(size);
     return (
       point: Offset(
-          size.width / 2 + coordinates.x * scale * sceneScale,
-          size.height / 2 - coordinates.z * scale * sceneScale,
+        size.width / 2 + coordinates.x * scale * _sceneScale(size),
+        size.height / 2 - coordinates.z * scale * _sceneScale(size),
       ),
       scale: scale,
     );
   }
 
-    double _sceneScale(Size size) => math.min(size.width / 36, size.height / 28);
+  double _sceneScale(Size size) => math.min(size.width / 36, size.height / 28);
 
   ({double x, double z, double depth}) _cameraCoordinates(
     GraphicSphere sphere,
@@ -249,4 +338,16 @@ class _GraphicScenePainter extends CustomPainter {
       oldDelegate.pitch != pitch ||
       oldDelegate.zoom != zoom ||
       oldDelegate.drawGrid != drawGrid;
+}
+
+class _RayHit {
+  const _RayHit({
+    required this.distance,
+    required this.normal,
+    required this.color,
+  });
+
+  final double distance;
+  final ({double x, double z, double depth}) normal;
+  final Color color;
 }
