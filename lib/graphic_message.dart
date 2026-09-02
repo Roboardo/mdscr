@@ -32,9 +32,12 @@ class GraphicMessage extends StatelessWidget {
             child: Stack(
               fit: StackFit.expand,
               children: [
-                CustomPaint(
-                  painter: _GraphicScenePainter(spheres),
-                  child: const SizedBox.expand(),
+                RepaintBoundary(
+                  child: CustomPaint(
+                    painter: _GraphicScenePainter(spheres),
+                    isComplex: true,
+                    child: const SizedBox.expand(),
+                  ),
                 ),
                 if (onTap != null)
                   const Align(
@@ -117,15 +120,19 @@ class _GraphicViewerScreenState extends State<GraphicViewerScreen> {
           onScaleUpdate: _updateGesture,
           onDoubleTap: _resetView,
           behavior: HitTestBehavior.opaque,
-          child: CustomPaint(
-            painter: _GraphicScenePainter(
-              widget.spheres,
-              yaw: _yaw,
-              pitch: _pitch,
-              zoom: _zoom,
-              drawGrid: false,
+          child: RepaintBoundary(
+            child: CustomPaint(
+              painter: _GraphicScenePainter(
+                widget.spheres,
+                yaw: _yaw,
+                pitch: _pitch,
+                zoom: _zoom,
+                drawGrid: false,
+              ),
+              isComplex: true,
+              willChange: true,
+              child: const SizedBox.expand(),
             ),
-            child: const SizedBox.expand(),
           ),
         ),
       ),
@@ -185,8 +192,15 @@ class _GraphicScenePainter extends CustomPainter {
 
   void _paintRayTracedSpheres(Canvas canvas, Size size) {
     const cameraDistance = 18.5;
+    const maximumRayIntersections = 100000;
     final scale = _sceneScale(size) * zoom;
-    final sampleSize = drawGrid ? 3.0 : 2.0;
+    final baseSampleSize = drawGrid ? 3.0 : 2.0;
+    final sampleSize = math.max(
+      baseSampleSize,
+      math.sqrt(
+        size.width * size.height * spheres.length / maximumRayIntersections,
+      ),
+    );
     final samplesByColor = <Color, List<Offset>>{};
     final cameraSpheres = spheres
         .map(
@@ -288,7 +302,9 @@ class _GraphicScenePainter extends CustomPainter {
           lightLength,
     );
     final brightness = .16 + diffuse * .84;
-    return Color.lerp(Colors.black, color, brightness)!.withValues(alpha: 1);
+    final quantizedBrightness = (brightness * 15).round() / 15;
+    return Color.lerp(Colors.black, color, quantizedBrightness)!
+      .withValues(alpha: 1);
   }
 
   ({Offset point, double scale}) _project(GraphicSphere sphere, Size size) {

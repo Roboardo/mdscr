@@ -6,6 +6,8 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 
 import 'conversation_log.dart';
+import 'graphic_message.dart';
+import 'music_message.dart';
 import 'settings.dart';
 import 'signal_dictionary.dart';
 
@@ -448,8 +450,40 @@ class _ConversationLogScreenState extends State<ConversationLogScreen> {
             separatorBuilder: (_, __) => const Divider(height: 1),
             itemBuilder: (context, index) {
               final entry = entries[entries.length - 1 - index];
+              final spheres = entry.signals == null
+                  ? null
+                  : parseGraphicSpheres(entry.signals!);
+              final notes = entry.signals == null
+                  ? null
+                  : parseMusicNotes(entry.signals!);
               return ListTile(
-                title: Text(entry.text),
+                title: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (spheres != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: GraphicMessage(
+                          spheres: spheres,
+                          onTap: () {
+                            Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) => GraphicViewerScreen(
+                                  spheres: spheres,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    if (notes != null)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: MusicMessage(notes: notes),
+                      ),
+                    Text(entry.text),
+                  ],
+                ),
                 subtitle: Text(
                   '${_timestamp(entry.receivedAt)} | '
                   '${decimalCallSignToOctal(entry.callSign)} | ${entry.sequence}',

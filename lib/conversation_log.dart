@@ -11,19 +11,25 @@ class ConversationLogEntry {
     required this.callSign,
     required this.sequence,
     required this.text,
+    this.signals,
   });
 
   final DateTime receivedAt;
   final int callSign;
   final int sequence;
   final String text;
+  final List<int>? signals;
 
-  Map<String, Object> toJson() => {
-        'receivedAt': receivedAt.toIso8601String(),
-        'callSign': callSign,
-        'sequence': sequence,
-        'text': text,
-      };
+  Map<String, Object> toJson() {
+    final entrySignals = signals;
+    return {
+      'receivedAt': receivedAt.toIso8601String(),
+      'callSign': callSign,
+      'sequence': sequence,
+      'text': text,
+      if (entrySignals != null) 'signals': entrySignals,
+    };
+  }
 
   factory ConversationLogEntry.fromJson(Map<String, dynamic> json) {
     return ConversationLogEntry(
@@ -31,6 +37,7 @@ class ConversationLogEntry {
       callSign: json['callSign'] as int,
       sequence: json['sequence'] as int,
       text: json['text'] as String,
+      signals: (json['signals'] as List<dynamic>?)?.cast<int>(),
     );
   }
 }
@@ -103,6 +110,7 @@ class SharedPreferencesConversationLogRepository
         callSign: message.callSign,
         sequence: message.sequence,
         text: text,
+        signals: List.unmodifiable(visibleSignalsForRelayMessage(message)),
       ),
     );
     final firstEntry = entries.length > _maximumEntries

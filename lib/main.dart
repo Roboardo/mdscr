@@ -74,13 +74,18 @@ Color callSignColor(int callSign) {
 }
 
 class ChatMessage {
-  const ChatMessage({
+  ChatMessage({
     required this.relayMessage,
     required this.receivedAt,
   });
 
   final RelayMessage relayMessage;
   final DateTime receivedAt;
+    late final List<int> visibleSignals =
+      List.unmodifiable(visibleSignalsForRelayMessage(relayMessage));
+    late final List<GraphicSphere>? graphicSpheres =
+      parseGraphicSpheres(visibleSignals);
+    late final List<MusicNote>? musicNotes = parseMusicNotes(visibleSignals);
 }
 
 String notificationBodyForRelayMessage(
@@ -1019,15 +1024,15 @@ class _MessageListState extends State<_MessageList>
         final chatMessage = widget.messages[index];
         final message = chatMessage.relayMessage;
         final encryptionKey = encryptionKeyForRelayMessage(message);
-        final signals = visibleSignalsForRelayMessage(message);
+        final signals = chatMessage.visibleSignals;
         final messageId = relayMessageId(message);
         final isLongMessage = signals.length > _collapseThreshold;
         final isExpanded = _expandedMessageIds.contains(messageId);
         final displayedSignals = isLongMessage && !isExpanded
             ? signals.take(_collapseThreshold).toList()
             : signals;
-        final graphicSpheres = parseGraphicSpheres(signals);
-        final musicNotes = parseMusicNotes(signals);
+        final graphicSpheres = chatMessage.graphicSpheres;
+        final musicNotes = chatMessage.musicNotes;
         final encryptionStatus = encryptionKey == null
             ? 'UNENCRYPTED'
             : 'ENCRYPTED ${widget.encryptionKeyLabel(encryptionKey)}';
