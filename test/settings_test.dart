@@ -79,6 +79,22 @@ void main() {
           isNull);
     });
 
+    test('parses structured MUSIC definitions, sequences, and chords', () {
+      final notes = parseMusicNotes([
+        -333, -14, -14, -11, 1, -14, -605003, -3, 1, -3, 440, -15,
+        -122, -11, 1, -122, -14, -605003, -3, 2, -3, 330, -605003, -3,
+        2, -3, 660, -15, -15,
+      ]);
+
+      expect(notes, hasLength(4));
+      expect(notes![0].delay, 0);
+      expect(notes[1].delay, 1);
+      expect(notes[2].delay, 2);
+      expect(notes[3].delay, 2);
+      expect(notes[2].frequency, 330);
+      expect(notes[3].frequency, 660);
+    });
+
     test('parses MFDS graphic sphere payloads', () {
       final spheres = parseGraphicSpheres([
         -53,

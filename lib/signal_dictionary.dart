@@ -12,6 +12,8 @@ const signalNote = -605003;
 const signalOpen = -14;
 const signalClose = -15;
 const signalSeparator = -3;
+const signalThen = -122;
+const signalDefinition = -11;
 const signalNegative = -1;
 const signalDecimal = -10;
 
@@ -55,6 +57,11 @@ List<MusicNote>? parseMusicNotes(List<int> signals) {
   if (musicStart + 1 >= signals.length ||
       signals[musicStart + 1] != signalOpen) {
     return null;
+  }
+
+  if (musicStart + 2 < signals.length &&
+      signals[musicStart + 2] == signalOpen) {
+    return _parseStructuredMusic(signals, musicStart + 1);
   }
 
   var current = musicStart + 2;
@@ -101,6 +108,178 @@ List<MusicNote>? parseMusicNotes(List<int> signals) {
     if (signals[current] == signalClose) {
       return List.unmodifiable(notes);
     }
+  }
+}
+
+List<MusicNote>? _parseStructuredMusic(List<int> signals, int start) {
+  final parser = _MusicParser(signals, start);
+  final music = parser.parseGroup();
+  if (music == null || parser.current != signals.length) {
+    return null;
+  }
+
+  final notes = <MusicNote>[];
+  if (_playMusicExpression(music, 0, <int, _MusicExpression>{}, <int>{}, notes) ==
+      null) {
+    return null;
+  }
+  return List.unmodifiable(notes);
+}
+
+double? _playMusicExpression(
+  _MusicExpression expression,
+  double start,
+  Map<int, _MusicExpression> definitions,
+  Set<int> activeDefinitions,
+  List<MusicNote> notes,
+) {
+  if (expression case _MusicNoteExpression(:final duration, :final frequency)) {
+    notes.add(MusicNote(delay: start, duration: duration, frequency: frequency));
+    return duration;
+  }
+  if (expression case _MusicReferenceExpression(:final id)) {
+    final definition = definitions[id];
+    if (definition == null || !activeDefinitions.add(id)) {
+      return null;
+    }
+    final duration = _playMusicExpression(
+      definition,
+      start,
+      definitions,
+      activeDefinitions,
+      notes,
+    );
+    activeDefinitions.remove(id);
+    return duration;
+  }
+  if (expression case _MusicDefinitionExpression(:final id, :final value)) {
+    definitions[id] = value;
+    return _playMusicExpression(value, start, definitions, activeDefinitions, notes);
+  }
+
+  final group = expression as _MusicGroupExpression;
+  var offset = start;
+  for (final stage in group.stages) {
+    var stageDuration = 0.0;
+    for (final item in stage) {
+      final duration = _playMusicExpression(
+        item,
+        offset,
+        definitions,
+        activeDefinitions,
+        notes,
+      );
+      if (duration == null) {
+        return null;
+      }
+      stageDuration = stageDuration < duration ? duration : stageDuration;
+    }
+    offset += stageDuration;
+  }
+  return offset - start;
+}
+
+sealed class _MusicExpression {}
+
+class _MusicNoteExpression extends _MusicExpression {
+  _MusicNoteExpression(this.duration, this.frequency);
+
+  final double duration;
+  final double frequency;
+}
+
+class _MusicReferenceExpression extends _MusicExpression {
+  _MusicReferenceExpression(this.id);
+
+  final int id;
+}
+
+class _MusicDefinitionExpression extends _MusicExpression {
+  _MusicDefinitionExpression(this.id, this.value);
+
+  final int id;
+  final _MusicExpression value;
+}
+
+class _MusicGroupExpression extends _MusicExpression {
+  _MusicGroupExpression(this.stages);
+
+  final List<List<_MusicExpression>> stages;
+}
+
+class _MusicParser {
+  _MusicParser(this.signals, this.current);
+
+  final List<int> signals;
+  int current;
+
+  _MusicGroupExpression? parseGroup() {
+    if (current >= signals.length || signals[current++] != signalOpen) {
+      return null;
+    }
+    final stages = <List<_MusicExpression>>[];
+    var stage = <_MusicExpression>[];
+    while (current < signals.length && signals[current] != signalClose) {
+      final expression = parseExpression();
+      if (expression == null) {
+        return null;
+      }
+      stage.add(expression);
+      if (current < signals.length && signals[current] == signalThen) {
+        current++;
+        if (stage.isNotEmpty) {
+          stages.add(stage);
+          stage = <_MusicExpression>[];
+        }
+      }
+    }
+    if (current >= signals.length || signals[current++] != signalClose) {
+      return null;
+    }
+    if (stage.isNotEmpty) {
+      stages.add(stage);
+    }
+    return _MusicGroupExpression(stages);
+  }
+
+  _MusicExpression? parseExpression() {
+    if (current >= signals.length) {
+      return null;
+    }
+    if (signals[current] == signalOpen) {
+      return parseGroup();
+    }
+    if (signals[current++] == signalNote) {
+      if (current >= signals.length || signals[current++] != signalSeparator) {
+        return null;
+      }
+      final duration = _consumeGraphicNumber(signals, current);
+      if (duration == null || duration.value <= 0) {
+        return null;
+      }
+      current = duration.nextIndex;
+      if (current >= signals.length || signals[current++] != signalSeparator) {
+        return null;
+      }
+      final frequency = _consumeGraphicNumber(signals, current);
+      if (frequency == null || frequency.value <= 0) {
+        return null;
+      }
+      current = frequency.nextIndex;
+      return _MusicNoteExpression(duration.value, frequency.value);
+    }
+    current--;
+    if (signals[current++] != signalDefinition ||
+        current >= signals.length ||
+        signals[current] < 0) {
+      return null;
+    }
+    final id = signals[current++];
+    if (current < signals.length && signals[current] == signalOpen) {
+      final value = parseGroup();
+      return value == null ? null : _MusicDefinitionExpression(id, value);
+    }
+    return _MusicReferenceExpression(id);
   }
 }
 
