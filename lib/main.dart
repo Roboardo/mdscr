@@ -136,6 +136,7 @@ class _ChatScreenState extends State<ChatScreen>
   int? _callSign;
   List<int> _activeCallSigns = const [];
   bool _isAppInForeground = true;
+  bool _isExiting = false;
 
   @override
   void initState() {
@@ -146,6 +147,7 @@ class _ChatScreenState extends State<ChatScreen>
     _messageController.addListener(_onComposerChanged);
     _loadSettingsAndConnect();
     unawaited(_requestNotificationPermission());
+    unawaited(_clearIncomingMessageNotifications());
   }
 
   List<int> get _encryptionTabKeys {
@@ -209,9 +211,11 @@ class _ChatScreenState extends State<ChatScreen>
     if (state == AppLifecycleState.resumed) {
       _isAppInForeground = true;
       unawaited(_stopBackgroundConnection());
+      unawaited(_clearIncomingMessageNotifications());
     } else if ((state == AppLifecycleState.inactive ||
             state == AppLifecycleState.hidden ||
             state == AppLifecycleState.paused) &&
+        !_isExiting &&
         settings != null &&
         settings.backgroundConnectionGraceSeconds != 0 &&
         _connectionStatus == ConnectionStatus.connected) {
@@ -257,6 +261,52 @@ class _ChatScreenState extends State<ChatScreen>
     } on MissingPluginException {
       // Other platforms continue with their normal lifecycle behavior.
     }
+  }
+
+  Future<void> _clearIncomingMessageNotifications() async {
+    try {
+      await _backgroundConnectionChannel.invokeMethod<void>(
+        'clearIncomingMessageNotifications',
+      );
+    } on PlatformException {
+      // Notifications are currently implemented for Android.
+    } on MissingPluginException {
+      // Other platforms do not yet provide a notification implementation.
+    }
+  }
+
+  Future<bool> _confirmExit() async {
+    final shouldExit = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('EXIT MDSCR = ?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('FALSE'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('TRUE'),
+          ),
+        ],
+      ),
+    );
+    if (shouldExit != true || !mounted) {
+      return false;
+    }
+
+    _isExiting = true;
+    await _stopBackgroundConnection();
+    await _clearIncomingMessageNotifications();
+    try {
+      await _backgroundConnectionChannel.invokeMethod<void>('exitApp');
+    } on PlatformException {
+      await SystemNavigator.pop();
+    } on MissingPluginException {
+      await SystemNavigator.pop();
+    }
+    return false;
   }
 
   Future<void> _loadSettingsAndConnect() async {
@@ -690,9 +740,11 @@ class _ChatScreenState extends State<ChatScreen>
         _messageController.text.split(RegExp(r'\s')).last.toUpperCase();
     final suggestions = settings?.dictionary.matchingEntries(query) ?? const [];
     final encryptionTabKeys = _encryptionTabKeys;
-    return Theme(
-      data: terminalTheme(settings?.theme ?? AppTheme.terminalDark),
-      child: Scaffold(
+    return WillPopScope(
+      onWillPop: _confirmExit,
+      child: Theme(
+        data: terminalTheme(settings?.theme ?? AppTheme.terminalDark),
+        child: Scaffold(
         appBar: AppBar(
           title: _ConnectionHeader(
             status: _connectionStatus,
@@ -818,6 +870,7 @@ class _ChatScreenState extends State<ChatScreen>
               ),
             ),
           ],
+        ),
         ),
       ),
     );

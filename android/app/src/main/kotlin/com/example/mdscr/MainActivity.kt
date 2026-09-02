@@ -36,6 +36,16 @@ class MainActivity : FlutterActivity() {
 						stopService(Intent(this, ConnectionKeepAliveService::class.java))
 						result.success(null)
 					}
+					"clearIncomingMessageNotifications" -> {
+						clearIncomingMessageNotifications()
+						result.success(null)
+					}
+					"exitApp" -> {
+						stopService(Intent(this, ConnectionKeepAliveService::class.java))
+						clearIncomingMessageNotifications()
+						finishAndRemoveTask()
+						result.success(null)
+					}
 					"requestNotificationPermission" -> {
 						requestNotificationPermission()
 						result.success(null)
@@ -53,6 +63,11 @@ class MainActivity : FlutterActivity() {
 					else -> result.notImplemented()
 				}
 			}
+	}
+
+	override fun onResume() {
+		super.onResume()
+		clearIncomingMessageNotifications()
 	}
 
 	private fun requestNotificationPermission() {
@@ -108,6 +123,12 @@ class MainActivity : FlutterActivity() {
 			.build()
 		getSystemService(NotificationManager::class.java)
 			.notify(incomingMessageNotificationId, notification)
+	}
+
+	private fun clearIncomingMessageNotifications() {
+		incomingMessages.clear()
+		getSystemService(NotificationManager::class.java)
+			.cancel(incomingMessageNotificationId)
 	}
 
 	private fun createIncomingMessageNotificationChannel() {
