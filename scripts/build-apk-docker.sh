@@ -9,7 +9,7 @@ readonly FLUTTER_IMAGE="${FLUTTER_IMAGE:-ghcr.io/cirruslabs/flutter:stable}"
 readonly CACHE_DIR="$PROJECT_DIR/.docker-cache"
 
 case "$BUILD_MODE" in
-  debug|release)
+  debug|release|test)
     ;;
   *)
     printf 'Usage: %s [debug|release]\n' "$0" >&2
@@ -67,4 +67,8 @@ docker run --rm \
         -keyalg RSA -keysize 2048 -validity 10000 \
         -dname 'CN=Android Debug,O=Android,C=US'
     fi
-    flutter build apk --$BUILD_MODE"
+    if [[ "$BUILD_MODE" == test ]]; then
+      flutter test
+    else
+      flutter build apk --$BUILD_MODE
+    fi"

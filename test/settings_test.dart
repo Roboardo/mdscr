@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mdscr/settings.dart';
 import 'package:mdscr/signal_dictionary.dart';
@@ -72,27 +74,36 @@ void main() {
       ]);
 
       expect(notes, hasLength(2));
-      expect(notes!.first.delay, 0);
-      expect(notes.first.duration, .2);
+      expect(notes!.first.delay, .2 * musicSecond);
+      expect(notes.first.duration, .2 * musicSecond);
       expect(notes.first.frequency, 392);
       expect(parseMusicNotes([-333, -14, -605003, 0, -3, 1, -3, 0, -15]),
           isNull);
     });
 
-    test('parses structured MUSIC definitions, sequences, and chords', () {
+    test('parses duration-only structured MUSIC notes as rests', () {
       final notes = parseMusicNotes([
-        -333, -14, -14, -11, 1, -14, -605003, -3, 1, -3, 440, -15,
-        -122, -11, 1, -122, -14, -605003, -3, 2, -3, 330, -605003, -3,
-        2, -3, 660, -15, -15,
+        -333, -14, -14, -605003, -3, 1, -3, -122, -605003, -3, 1,
+        -3, 440, -15, -15,
       ]);
 
-      expect(notes, hasLength(4));
-      expect(notes![0].delay, 0);
-      expect(notes[1].delay, 1);
-      expect(notes[2].delay, 2);
-      expect(notes[3].delay, 2);
-      expect(notes[2].frequency, 330);
-      expect(notes[3].frequency, 660);
+      expect(notes, hasLength(1));
+      expect(notes!.single.delay, musicSecond);
+      expect(notes.single.frequency, 440);
+    });
+
+    test('parses the supplied structured Tetris MUSIC stream', () {
+      final signals = File('music-sample')
+          .readAsStringSync()
+          .trim()
+          .split(RegExp(r'\s+'))
+          .map(int.parse)
+          .toList();
+
+      final notes = parseMusicNotes(signals);
+      expect(notes, isNotNull);
+      expect(notes!.length, greaterThan(100));
+      expect(notes.last.delay, greaterThan(30));
     });
 
     test('parses MFDS graphic sphere payloads', () {

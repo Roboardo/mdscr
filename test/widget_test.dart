@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mdscr/graphic_message.dart';
 import 'package:mdscr/main.dart';
+import 'package:mdscr/music_message.dart';
 import 'package:mdscr/settings.dart';
 import 'package:mdscr/signal_dictionary.dart';
 
@@ -35,6 +37,30 @@ void main() {
       notificationBodyForRelayMessage(message, dictionary),
       'ENCRYPTED SIGNAL MESSAGE',
     );
+  });
+
+  test('creates music WAV data in a background isolate', () async {
+    final wave = await compute(createMusicWaveFromData, [
+      [0.0, .1, 440.0],
+    ]);
+
+    expect(wave.length, greaterThan(44));
+    expect(wave.sublist(0, 4), [82, 73, 70, 70]);
+  });
+
+  testWidgets('music player uses a high-contrast lime play control', (tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(
+        home: Scaffold(
+          body: MusicMessage(
+            notes: [MusicNote(delay: 0, duration: .1, frequency: 440)],
+          ),
+        ),
+      ),
+    );
+
+    final button = tester.widget<IconButton>(find.byType(IconButton));
+    expect(button.style?.foregroundColor?.resolve({}), Colors.black);
   });
 
   testWidgets('3D graphic viewer provides reset controls', (tester) async {

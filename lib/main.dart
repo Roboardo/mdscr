@@ -85,7 +85,8 @@ class ChatMessage {
       List.unmodifiable(visibleSignalsForRelayMessage(relayMessage));
     late final List<GraphicSphere>? graphicSpheres =
       parseGraphicSpheres(visibleSignals);
-    late final List<MusicNote>? musicNotes = parseMusicNotes(visibleSignals);
+
+  List<MusicNote>? get musicNotes => parseMusicNotes(visibleSignals);
 }
 
 String notificationBodyForRelayMessage(
@@ -108,6 +109,10 @@ TextEditingValue insertTextAtSelection(TextEditingValue value, String text) {
     text: updatedText,
     selection: TextSelection.collapsed(offset: start + text.length),
   );
+}
+
+String exitPromptSignalText(SignalDictionary? dictionary, int signal) {
+  return dictionary?.displayTextForSignal(signal) ?? signal.toString();
 }
 
 class ChatScreen extends StatefulWidget {
@@ -281,18 +286,22 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   Future<bool> _confirmExit() async {
+    final dictionary = _settings?.dictionary;
     final shouldExit = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('EXIT MDSCR = ?'),
+        title: Text(
+          'EXIT MDSCR ${exitPromptSignalText(dictionary, -4)} '
+          '${exitPromptSignalText(dictionary, -12)}',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('FALSE'),
+            child: Text(exitPromptSignalText(dictionary, -28)),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('TRUE'),
+            child: Text(exitPromptSignalText(dictionary, -27)),
           ),
         ],
       ),

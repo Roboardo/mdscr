@@ -16,6 +16,7 @@ const signalThen = -122;
 const signalDefinition = -11;
 const signalNegative = -1;
 const signalDecimal = -10;
+const musicSecond = .8066;
 
 class GraphicSphere {
   const GraphicSphere({
@@ -90,8 +91,8 @@ List<MusicNote>? parseMusicNotes(List<int> signals) {
     }
     notes.add(
       MusicNote(
-        delay: values[0],
-        duration: values[1],
+        delay: values[0] * musicSecond,
+        duration: values[1] * musicSecond,
         frequency: values[2],
       ),
     );
@@ -119,11 +120,37 @@ List<MusicNote>? _parseStructuredMusic(List<int> signals, int start) {
   }
 
   final notes = <MusicNote>[];
-  if (_playMusicExpression(music, 0, <int, _MusicExpression>{}, <int>{}, notes) ==
-      null) {
+  final definitions = <int, _MusicExpression>{};
+  _registerMusicDefinitions(music, definitions);
+  if (_playMusicExpression(music, 0, definitions, <int>{}, notes) == null) {
     return null;
   }
-  return List.unmodifiable(notes);
+  return List.unmodifiable([
+    for (final note in notes)
+      MusicNote(
+        delay: note.delay * musicSecond,
+        duration: note.duration * musicSecond,
+        frequency: note.frequency,
+      ),
+  ]);
+}
+
+void _registerMusicDefinitions(
+  _MusicExpression expression,
+  Map<int, _MusicExpression> definitions,
+) {
+  if (expression case _MusicDefinitionExpression(:final id, :final value)) {
+    definitions[id] = value;
+    _registerMusicDefinitions(value, definitions);
+    return;
+  }
+  if (expression case _MusicGroupExpression(:final stages)) {
+    for (final stage in stages) {
+      for (final item in stage) {
+        _registerMusicDefinitions(item, definitions);
+      }
+    }
+  }
 }
 
 double? _playMusicExpression(
@@ -135,6 +162,9 @@ double? _playMusicExpression(
 ) {
   if (expression case _MusicNoteExpression(:final duration, :final frequency)) {
     notes.add(MusicNote(delay: start, duration: duration, frequency: frequency));
+    return duration;
+  }
+  if (expression case _MusicRestExpression(:final duration)) {
     return duration;
   }
   if (expression case _MusicReferenceExpression(:final id)) {
@@ -186,6 +216,12 @@ class _MusicNoteExpression extends _MusicExpression {
 
   final double duration;
   final double frequency;
+}
+
+class _MusicRestExpression extends _MusicExpression {
+  _MusicRestExpression(this.duration);
+
+  final double duration;
 }
 
 class _MusicReferenceExpression extends _MusicExpression {
@@ -260,6 +296,11 @@ class _MusicParser {
       current = duration.nextIndex;
       if (current >= signals.length || signals[current++] != signalSeparator) {
         return null;
+      }
+      if (current >= signals.length ||
+          signals[current] == signalThen ||
+          signals[current] == signalClose) {
+        return _MusicRestExpression(duration.value);
       }
       final frequency = _consumeGraphicNumber(signals, current);
       if (frequency == null || frequency.value <= 0) {
@@ -350,6 +391,14 @@ List<GraphicSphere>? parseGraphicSpheres(List<int> signals) {
   if (current < signals.length && signals[current] == signalNegative) {
     negative = true;
     current++;
+  }
+  if (current < signals.length && signals[current] == signalDecimal) {
+    current++;
+    if (current >= signals.length || signals[current] < 0) {
+      return null;
+    }
+    final value = double.parse('0.${signals[current++]}');
+    return (value: negative ? -value : value, nextIndex: current);
   }
   if (current >= signals.length || signals[current] < 0) {
     return null;
@@ -587,9 +636,14 @@ class SignalDictionary {
         signals[index - 2] == signals[index - 1] &&
         signals[index - 1] < 0 &&
         descriptions[signals[index - 1]]?.breakOnDouble == true;
-    return breakAfterDouble
-        ? _separatorFor(SignalFormatMode.lineBreak)
-        : separatorBetween(signals[index - 1], signals[index]);
+    if (breakAfterDouble) {
+      return _separatorFor(SignalFormatMode.lineBreak);
+    }
+    final joinsDouble =
+      signals[index] == signals[index - 1] && signals[index] < 0;
+    return joinsDouble
+      ? ''
+      : separatorBetween(signals[index - 1], signals[index]);
   }
 
   String separatorBetween(int firstSignal, int secondSignal) {

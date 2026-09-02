@@ -2,6 +2,7 @@ import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'signal_dictionary.dart';
@@ -17,11 +18,17 @@ class MusicMessage extends StatefulWidget {
 
 class _MusicMessageState extends State<MusicMessage> {
   final _player = AudioPlayer();
+  bool _isLoading = false;
   bool _isPlaying = false;
 
   @override
   void initState() {
     super.initState();
+    _player.onPlayerStateChanged.listen((state) {
+      if (mounted) {
+        setState(() => _isPlaying = state == PlayerState.playing);
+      }
+    });
     _player.onPlayerComplete.listen((_) {
       if (mounted) {
         setState(() => _isPlaying = false);
@@ -30,6 +37,9 @@ class _MusicMessageState extends State<MusicMessage> {
   }
 
   Future<void> _togglePlayback() async {
+    if (_isLoading) {
+      return;
+    }
     if (_isPlaying) {
       await _player.stop();
       if (mounted) {
@@ -37,8 +47,31 @@ class _MusicMessageState extends State<MusicMessage> {
       }
       return;
     }
-    setState(() => _isPlaying = true);
-    await _player.play(BytesSource(_createWave(widget.notes)));
+    setState(() => _isLoading = true);
+    try {
+      final wave = await compute(
+        createMusicWaveFromData,
+        [
+          for (final note in widget.notes)
+            [note.delay, note.duration, note.frequency],
+        ],
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() => _isLoading = false);
+      await _player.play(BytesSource(wave, mimeType: 'audio/wav'));
+    } catch (error) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isPlaying = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('MUSIC PLAYBACK FAILED: $error')),
+        );
+      }
+    }
   }
 
   @override
@@ -53,9 +86,26 @@ class _MusicMessageState extends State<MusicMessage> {
       mainAxisSize: MainAxisSize.min,
       children: [
         IconButton.filled(
-          icon: Icon(_isPlaying ? Icons.stop : Icons.play_arrow),
-          tooltip: _isPlaying ? 'STOP MUSIC' : 'PLAY MUSIC',
-          onPressed: _togglePlayback,
+          style: IconButton.styleFrom(
+            backgroundColor: Colors.limeAccent.shade400,
+            foregroundColor: Colors.black,
+          ),
+          icon: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    color: Colors.black,
+                    strokeWidth: 2,
+                  ),
+                )
+              : Icon(_isPlaying ? Icons.stop : Icons.play_arrow),
+          tooltip: _isLoading
+              ? 'LOADING MUSIC'
+              : _isPlaying
+              ? 'STOP MUSIC'
+              : 'PLAY MUSIC',
+          onPressed: _isLoading ? null : _togglePlayback,
         ),
         const SizedBox(width: 8),
         Text('MUSIC: ${widget.notes.length} NOTES'),
@@ -64,7 +114,7 @@ class _MusicMessageState extends State<MusicMessage> {
   }
 }
 
-Uint8List _createWave(List<MusicNote> notes) {
+Uint8List createMusicWave(List<MusicNote> notes) {
   const sampleRate = 44100;
   final duration = notes
       .map((note) => note.delay + note.duration)
@@ -75,22 +125,40 @@ Uint8List _createWave(List<MusicNote> notes) {
   final bytes = ByteData(44 + sampleCount * 2);
   _writeWaveHeader(bytes, sampleCount, sampleRate);
 
-  for (var sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++) {
-    final time = sampleIndex / sampleRate;
-    var amplitude = 0.0;
-    var activeNotes = 0;
-    for (final note in notes) {
-      if (time >= note.delay && time < note.delay + note.duration) {
-        amplitude += math.sin(2 * math.pi * note.frequency * (time - note.delay));
-        activeNotes++;
-      }
+  final amplitudes = Float64List(sampleCount);
+  final activeNotes = Uint16List(sampleCount);
+  for (final note in notes) {
+    final firstSample = (note.delay * sampleRate).ceil().clamp(0, sampleCount);
+    final lastSample = ((note.delay + note.duration) * sampleRate)
+        .ceil()
+        .clamp(0, sampleCount);
+    for (var sampleIndex = firstSample; sampleIndex < lastSample; sampleIndex++) {
+      final time = sampleIndex / sampleRate - note.delay;
+      amplitudes[sampleIndex] += math.sin(2 * math.pi * note.frequency * time);
+      activeNotes[sampleIndex]++;
     }
-    final sample = activeNotes == 0
+  }
+
+  for (var sampleIndex = 0; sampleIndex < sampleCount; sampleIndex++) {
+    final sample = activeNotes[sampleIndex] == 0
         ? 0
-        : (amplitude / activeNotes * 0x5fff).round().clamp(-0x8000, 0x7fff);
+        : (amplitudes[sampleIndex] / activeNotes[sampleIndex] * 0x5fff)
+            .round()
+            .clamp(-0x8000, 0x7fff);
     bytes.setInt16(44 + sampleIndex * 2, sample, Endian.little);
   }
   return bytes.buffer.asUint8List();
+}
+
+Uint8List createMusicWaveFromData(List<List<double>> noteData) {
+  return createMusicWave([
+    for (final values in noteData)
+      MusicNote(
+        delay: values[0],
+        duration: values[1],
+        frequency: values[2],
+      ),
+  ]);
 }
 
 void _writeWaveHeader(ByteData bytes, int sampleCount, int sampleRate) {
