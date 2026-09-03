@@ -154,6 +154,20 @@ void main() {
       expect(notes.last.delay, greaterThan(30));
     });
 
+    test('preserves standard pitches from the supplied MUSIC stream', () {
+      final signals = File('music-sample2')
+          .readAsStringSync()
+          .trim()
+          .split(RegExp(r'\s+'))
+          .map(int.parse)
+          .toList();
+
+      final notes = parseMusicNotes(signals);
+      expect(notes, isNotNull);
+      expect(notes!.map((note) => note.frequency), containsAll([440, 587]));
+      expect(notes.map((note) => note.frequency), contains(58.3));
+    });
+
     test('parses MFDS graphic sphere payloads', () {
       final spheres = parseGraphicSpheres([
         -53,

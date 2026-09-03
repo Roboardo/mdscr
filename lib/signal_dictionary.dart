@@ -11,6 +11,10 @@ const signalSong = -577;
 const signalNote = -605003;
 const signalOpen = -14;
 const signalClose = -15;
+const signalOpenBracket = -140412;
+const signalCloseBracket = -140413;
+const signalOpenBrace = -140414;
+const signalCloseBrace = -140415;
 const signalSeparator = -3;
 const signalThen = -122;
 const signalDefinition = -11;
@@ -64,7 +68,7 @@ List<MusicNote>? parseMusicNotes(List<int> signals) {
   }
 
   if (musicStart + 2 < signals.length &&
-      signals[musicStart + 2] == signalOpen) {
+      _matchingMusicCloseSignal(signals[musicStart + 2]) != null) {
     return _parseStructuredMusic(signals, musicStart + 1);
   }
 
@@ -253,12 +257,16 @@ class _MusicParser {
   int current;
 
   _MusicGroupExpression? parseGroup() {
-    if (current >= signals.length || signals[current++] != signalOpen) {
+    if (current >= signals.length) {
+      return null;
+    }
+    final closeSignal = _matchingMusicCloseSignal(signals[current++]);
+    if (closeSignal == null) {
       return null;
     }
     final stages = <List<_MusicExpression>>[];
     var stage = <_MusicExpression>[];
-    while (current < signals.length && signals[current] != signalClose) {
+    while (current < signals.length && signals[current] != closeSignal) {
       final expression = parseExpression();
       if (expression == null) {
         return null;
@@ -272,7 +280,7 @@ class _MusicParser {
         }
       }
     }
-    if (current >= signals.length || signals[current++] != signalClose) {
+    if (current >= signals.length || signals[current++] != closeSignal) {
       return null;
     }
     if (stage.isNotEmpty) {
@@ -285,7 +293,7 @@ class _MusicParser {
     if (current >= signals.length) {
       return null;
     }
-    if (signals[current] == signalOpen) {
+    if (_matchingMusicCloseSignal(signals[current]) != null) {
       return parseGroup();
     }
     if (signals[current++] == signalNote) {
@@ -302,7 +310,7 @@ class _MusicParser {
       }
       if (current >= signals.length ||
           signals[current] == signalThen ||
-          signals[current] == signalClose) {
+          _isMusicCloseSignal(signals[current])) {
         return _MusicRestExpression(duration.value);
       }
       final frequency = _consumeGraphicNumber(signals, current);
@@ -319,13 +327,26 @@ class _MusicParser {
       return null;
     }
     final id = signals[current++];
-    if (current < signals.length && signals[current] == signalOpen) {
+    if (current < signals.length &&
+      _matchingMusicCloseSignal(signals[current]) != null) {
       final value = parseGroup();
       return value == null ? null : _MusicDefinitionExpression(id, value);
     }
     return _MusicReferenceExpression(id);
   }
 }
+
+int? _matchingMusicCloseSignal(int openSignal) => switch (openSignal) {
+  signalOpen => signalClose,
+  signalOpenBracket => signalCloseBracket,
+  signalOpenBrace => signalCloseBrace,
+  _ => null,
+};
+
+bool _isMusicCloseSignal(int signal) =>
+    signal == signalClose ||
+    signal == signalCloseBracket ||
+    signal == signalCloseBrace;
 
 List<GraphicSphere>? parseGraphicSpheres(List<int> signals) {
   if (signals.where((signal) => signal == signalGraphic).length != 1) {

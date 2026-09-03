@@ -119,7 +119,7 @@ Uint8List createMusicWave(List<MusicNote> notes) {
   final duration = notes
       .map((note) => note.delay + note.duration)
       .reduce(math.max)
-      .clamp(0, 60)
+      .clamp(0, 10 * 60)
       .toDouble();
   final sampleCount = (duration * sampleRate).ceil();
   final bytes = ByteData(44 + sampleCount * 2);
