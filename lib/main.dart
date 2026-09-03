@@ -1061,11 +1061,16 @@ class _MessageListState extends State<_MessageList>
     }
   }
 
-  Future<void> _jumpToBottom() => _scrollController.animateTo(
+  Future<void> _jumpToBottom() async {
+    await _scrollController.animateTo(
     _scrollController.position.maxScrollExtent,
     duration: const Duration(milliseconds: 250),
     curve: Curves.easeOut,
   );
+    if (_scrollController.hasClients) {
+      _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+    }
+  }
 
   Future<void> _showMessageActions(RelayMessage message) async {
     final selection = await showModalBottomSheet<_MessageCopyAction>(
@@ -1267,7 +1272,8 @@ class _MessageListState extends State<_MessageList>
             right: 16,
             bottom: 16,
             child: Material(
-              color: Theme.of(context).colorScheme.surface,
+              color: Theme.of(context).appBarTheme.backgroundColor ??
+                  Theme.of(context).colorScheme.surface,
               shape: const CircleBorder(),
               child: IconButton(
                 tooltip: 'JUMP TO LATEST',
