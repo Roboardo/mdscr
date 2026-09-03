@@ -100,7 +100,7 @@ List<MusicNote>? parseMusicNotes(List<int> signals) {
       MusicNote(
         delay: values[0] * musicSecond,
         duration: values[1] * musicSecond,
-        frequency: values[2],
+        frequency: values[2] / musicSecond,
       ),
     );
 
@@ -137,7 +137,7 @@ List<MusicNote>? _parseStructuredMusic(List<int> signals, int start) {
       MusicNote(
         delay: note.delay * musicSecond,
         duration: note.duration * musicSecond,
-        frequency: note.frequency,
+        frequency: note.frequency / musicSecond,
       ),
   ]);
 }

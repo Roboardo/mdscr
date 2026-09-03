@@ -124,7 +124,7 @@ void main() {
       expect(notes, hasLength(2));
       expect(notes!.first.delay, .2 * musicSecond);
       expect(notes.first.duration, .2 * musicSecond);
-      expect(notes.first.frequency, 392);
+      expect(notes.first.frequency, 392 / musicSecond);
       expect(parseMusicNotes([-333, -14, -605003, 0, -3, 1, -3, 0, -15]),
           isNull);
     });
@@ -137,7 +137,7 @@ void main() {
 
       expect(notes, hasLength(1));
       expect(notes!.single.delay, musicSecond);
-      expect(notes.single.frequency, 440);
+      expect(notes.single.frequency, 440 / musicSecond);
     });
 
     test('parses the supplied structured Tetris MUSIC stream', () {
@@ -164,8 +164,11 @@ void main() {
 
       final notes = parseMusicNotes(signals);
       expect(notes, isNotNull);
-      expect(notes!.map((note) => note.frequency), containsAll([440, 587]));
-      expect(notes.map((note) => note.frequency), contains(58.3));
+      expect(
+        notes!.map((note) => note.frequency),
+        containsAll([440 / musicSecond, 587 / musicSecond]),
+      );
+      expect(notes.map((note) => note.frequency), contains(58.3 / musicSecond));
     });
 
     test('parses MFDS graphic sphere payloads', () {

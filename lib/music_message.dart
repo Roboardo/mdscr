@@ -134,7 +134,10 @@ Uint8List createMusicWave(List<MusicNote> notes) {
         .clamp(0, sampleCount);
     for (var sampleIndex = firstSample; sampleIndex < lastSample; sampleIndex++) {
       final time = sampleIndex / sampleRate - note.delay;
-      amplitudes[sampleIndex] += math.sin(2 * math.pi * note.frequency * time);
+      final phase = 2 * math.pi * note.frequency * time;
+      amplitudes[sampleIndex] +=
+          (math.sin(phase) + .5 * math.sin(2 * phase) + .25 * math.sin(3 * phase)) /
+          1.75;
       activeNotes[sampleIndex]++;
     }
   }
