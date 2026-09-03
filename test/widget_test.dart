@@ -39,6 +39,36 @@ void main() {
     );
   });
 
+  test('formats message text and raw data for copying', () {
+    const message = RelayMessage(callSign: 8, sequence: 12, signals: [-1, 42]);
+    const dictionary = SignalDictionary({-1: 'HELLO'});
+
+    expect(messageTextForClipboard(message, dictionary), 'HELLO 42');
+    expect(rawMessageDataForClipboard(message), 'R,8,12,-1,42');
+  });
+
+  test('replaces the composer token at the cursor', () {
+    const value = TextEditingValue(
+      text: 'FIRST HELO LAST',
+      selection: TextSelection.collapsed(offset: 8),
+    );
+
+    expect(messageTokenAtSelection(value), 'HELO');
+    expect(
+      replaceMessageTokenAtSelection(value, 'HELLO'),
+      const TextEditingValue(
+        text: 'FIRST HELLO LAST',
+        selection: TextSelection.collapsed(offset: 11),
+      ),
+    );
+  });
+
+  test('finds an empty composer token', () {
+    const value = TextEditingValue.empty;
+
+    expect(messageTokenAtSelection(value), isEmpty);
+  });
+
   test('creates music WAV data in a background isolate', () async {
     final wave = await compute(createMusicWaveFromData, [
       [0.0, .1, 440.0],

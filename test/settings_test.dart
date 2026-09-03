@@ -1,10 +1,25 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:mdscr/conversation_log.dart';
 import 'package:mdscr/settings.dart';
 import 'package:mdscr/signal_dictionary.dart';
 
 void main() {
+  test('formats saved log signals with the current dictionary', () {
+    final entry = ConversationLogEntry(
+      receivedAt: DateTime(2026),
+      callSign: 8,
+      sequence: 12,
+      text: '-1 42',
+      signals: const [-1, 42],
+    );
+    const dictionary = SignalDictionary({-1: 'UPDATED'});
+
+    expect(conversationLogText(entry, dictionary), 'UPDATED 42');
+    expect(rawConversationLogData(entry), 'R,8,12,-1,42');
+  });
+
   group('validateWebSocketUrl', () {
     test('accepts secure and local WebSocket addresses', () {
       expect(validateWebSocketUrl('wss://signals.example.org/chat'), isNull);
@@ -132,7 +147,7 @@ void main() {
       expect(spheres!.single.x, -2.5);
       expect(spheres.single.y, 3);
       expect(spheres.single.z, 4);
-      expect(spheres.single.radius, 2.5);
+      expect(spheres.single.radius, 1.25);
       expect(spheres.single.color, 32);
       expect(parseGraphicSpheres([-53, -14, -52, 1, -15]), isNull);
     });

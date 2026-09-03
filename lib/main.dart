@@ -100,6 +100,15 @@ String notificationBodyForRelayMessage(
   return String.fromCharCodes(body.runes.take(160));
 }
 
+String messageTextForClipboard(
+  RelayMessage message,
+  SignalDictionary? dictionary,
+) => dictionary?.formatSignals(visibleSignalsForRelayMessage(message)) ??
+    visibleSignalsForRelayMessage(message).join(' ');
+
+String rawMessageDataForClipboard(RelayMessage message) =>
+    'R,${message.callSign},${message.sequence},${message.signals.join(',')}';
+
 TextEditingValue insertTextAtSelection(TextEditingValue value, String text) {
   final selection = value.selection;
   final start = selection.isValid ? selection.start : value.text.length;
@@ -108,6 +117,37 @@ TextEditingValue insertTextAtSelection(TextEditingValue value, String text) {
   return value.copyWith(
     text: updatedText,
     selection: TextSelection.collapsed(offset: start + text.length),
+  );
+}
+
+({int start, int end}) messageTokenRangeAtSelection(TextEditingValue value) {
+  final cursor = value.selection.isValid
+      ? value.selection.extentOffset.clamp(0, value.text.length)
+      : value.text.length;
+  final start = cursor == 0
+      ? 0
+      : value.text.lastIndexOf(RegExp(r'\s'), cursor - 1) + 1;
+  final nextWhitespace = value.text.indexOf(RegExp(r'\s'), cursor);
+  return (start: start, end: nextWhitespace < 0 ? value.text.length : nextWhitespace);
+}
+
+String messageTokenAtSelection(TextEditingValue value) {
+  final range = messageTokenRangeAtSelection(value);
+  return value.text.substring(range.start, range.end);
+}
+
+TextEditingValue replaceMessageTokenAtSelection(
+  TextEditingValue value,
+  String replacement,
+) {
+  final range = messageTokenRangeAtSelection(value);
+  final suffix = range.end == value.text.length ? ' ' : '';
+  final text = value.text.replaceRange(range.start, range.end, '$replacement$suffix');
+  return value.copyWith(
+    text: text,
+    selection: TextSelection.collapsed(
+      offset: range.start + replacement.length + suffix.length,
+    ),
   );
 }
 
@@ -667,12 +707,9 @@ class _ChatScreenState extends State<ChatScreen>
   }
 
   void _insertSuggestion(MapEntry<int, String> suggestion) {
-    final text = _messageController.text;
-    final tokenStart = text.lastIndexOf(RegExp(r'\s')) + 1;
-    final updatedText = '${text.substring(0, tokenStart)}${suggestion.value} ';
-    _messageController.value = TextEditingValue(
-      text: updatedText,
-      selection: TextSelection.collapsed(offset: updatedText.length),
+    _messageController.value = replaceMessageTokenAtSelection(
+      _messageController.value,
+      suggestion.value,
     );
   }
 
@@ -750,8 +787,7 @@ class _ChatScreenState extends State<ChatScreen>
   @override
   Widget build(BuildContext context) {
     final settings = _settings;
-    final query =
-        _messageController.text.split(RegExp(r'\s')).last.toUpperCase();
+    final query = messageTokenAtSelection(_messageController.value).toUpperCase();
     final suggestions = settings?.dictionary.matchingEntries(query) ?? const [];
     final encryptionTabKeys = _encryptionTabKeys;
     return WillPopScope(
@@ -849,6 +885,8 @@ class _ChatScreenState extends State<ChatScreen>
                             controller: _messageController,
                             enabled:
                                 _connectionStatus == ConnectionStatus.connected,
+                            minLines: 1,
+                            maxLines: 5,
                             textCapitalization: TextCapitalization.characters,
                             inputFormatters: [
                               TextInputFormatter.withFunction(
@@ -857,8 +895,7 @@ class _ChatScreenState extends State<ChatScreen>
                                 ),
                               ),
                             ],
-                            textInputAction: TextInputAction.send,
-                            onSubmitted: (_) => _sendMessage(),
+                            textInputAction: TextInputAction.newline,
                             decoration: const InputDecoration(
                               border: OutlineInputBorder(),
                               hintText: 'SEND A MESSAGE',
@@ -986,6 +1023,36 @@ class _MessageListState extends State<_MessageList>
     }
   }
 
+  Future<void> _showMessageActions(RelayMessage message) async {
+    final selection = await showModalBottomSheet<_MessageCopyAction>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.content_copy_outlined),
+              title: const Text('COPY TEXT'),
+              onTap: () => Navigator.pop(context, _MessageCopyAction.text),
+            ),
+            ListTile(
+              leading: const Icon(Icons.data_object_outlined),
+              title: const Text('COPY RAW DATA'),
+              onTap: () => Navigator.pop(context, _MessageCopyAction.rawData),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (selection == null) {
+      return;
+    }
+    final text = selection == _MessageCopyAction.text
+        ? messageTextForClipboard(message, widget.dictionary)
+        : rawMessageDataForClipboard(message);
+    await Clipboard.setData(ClipboardData(text: text));
+  }
+
   @override
   void didChangeMetrics() {
     if (_wasAtBottom) {
@@ -1050,6 +1117,7 @@ class _MessageListState extends State<_MessageList>
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
+              onLongPress: () => _showMessageActions(message),
               title: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -1150,6 +1218,8 @@ class _MessageListState extends State<_MessageList>
     );
   }
 }
+
+enum _MessageCopyAction { text, rawData }
 
 class _SignalToken extends StatelessWidget {
   const _SignalToken({

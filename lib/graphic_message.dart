@@ -192,9 +192,9 @@ class _GraphicScenePainter extends CustomPainter {
 
   void _paintRayTracedSpheres(Canvas canvas, Size size) {
     const cameraDistance = 18.5;
-    const maximumRayIntersections = 100000;
+    const maximumRayIntersections = 400000;
     final scale = _sceneScale(size) * zoom;
-    final baseSampleSize = drawGrid ? 3.0 : 2.0;
+    final baseSampleSize = drawGrid ? 1.5 : 1.0;
     final sampleSize = math.max(
       baseSampleSize,
       math.sqrt(

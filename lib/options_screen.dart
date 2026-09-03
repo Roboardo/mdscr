@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'conversation_log.dart';
 import 'graphic_message.dart';
@@ -143,6 +144,7 @@ class _OptionsScreenState extends State<OptionsScreen> {
       MaterialPageRoute(
         builder: (_) => ConversationLogScreen(
           repository: widget.conversationLogRepository,
+          dictionary: _dictionary,
         ),
       ),
     );
@@ -355,9 +357,14 @@ class _OptionsScreenState extends State<OptionsScreen> {
 }
 
 class ConversationLogScreen extends StatefulWidget {
-  const ConversationLogScreen({required this.repository, super.key});
+  const ConversationLogScreen({
+    required this.repository,
+    required this.dictionary,
+    super.key,
+  });
 
   final ConversationLogRepository repository;
+  final SignalDictionary dictionary;
 
   @override
   State<ConversationLogScreen> createState() => _ConversationLogScreenState();
@@ -392,7 +399,7 @@ class _ConversationLogScreenState extends State<ConversationLogScreen> {
         .map(
           (entry) => '${_timestamp(entry.receivedAt)} | '
               '${decimalCallSignToOctal(entry.callSign)} | ${entry.sequence}\n'
-              '${entry.text}',
+              '${conversationLogText(entry, widget.dictionary)}',
         )
         .join('\n\n');
     final path = await FilePicker.platform.saveFile(
@@ -412,6 +419,36 @@ class _ConversationLogScreenState extends State<ConversationLogScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _showMessageActions(ConversationLogEntry entry) async {
+    final selection = await showModalBottomSheet<_LogCopyAction>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.content_copy_outlined),
+              title: const Text('COPY TEXT'),
+              onTap: () => Navigator.pop(context, _LogCopyAction.text),
+            ),
+            ListTile(
+              leading: const Icon(Icons.data_object_outlined),
+              title: const Text('COPY RAW DATA'),
+              onTap: () => Navigator.pop(context, _LogCopyAction.rawData),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (selection == null) {
+      return;
+    }
+    final text = selection == _LogCopyAction.text
+        ? conversationLogText(entry, widget.dictionary)
+        : rawConversationLogData(entry);
+    await Clipboard.setData(ClipboardData(text: text));
   }
 
   String _timestamp(DateTime value) {
@@ -457,6 +494,7 @@ class _ConversationLogScreenState extends State<ConversationLogScreen> {
                   ? null
                   : parseMusicNotes(entry.signals!);
               return ListTile(
+                onLongPress: () => _showMessageActions(entry),
                 title: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -481,7 +519,7 @@ class _ConversationLogScreenState extends State<ConversationLogScreen> {
                         padding: const EdgeInsets.only(bottom: 8),
                         child: MusicMessage(notes: notes),
                       ),
-                    Text(entry.text),
+                    Text(conversationLogText(entry, widget.dictionary)),
                   ],
                 ),
                 subtitle: Text(
@@ -495,3 +533,5 @@ class _ConversationLogScreenState extends State<ConversationLogScreen> {
     );
   }
 }
+
+enum _LogCopyAction { text, rawData }

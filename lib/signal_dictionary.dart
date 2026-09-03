@@ -366,7 +366,7 @@ List<GraphicSphere>? parseGraphicSpheres(List<int> signals) {
         x: coordinates[0],
         y: coordinates[1],
         z: coordinates[2],
-        radius: coordinates[3],
+        radius: coordinates[3] / 2,
         color: color,
       ),
     );
