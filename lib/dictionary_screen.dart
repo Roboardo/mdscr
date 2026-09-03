@@ -120,6 +120,7 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
                         labelText: 'NUMBER',
                         errorText: signalError,
                       ),
+                      onChanged: (_) => setDialogState(() {}),
                     ),
                     const SizedBox(height: 12),
                   ],
@@ -181,6 +182,19 @@ class _DictionaryScreenState extends State<DictionaryScreen> {
               ),
             ),
             actions: [
+              if (isNewEntry)
+                IconButton(
+                  icon: const Icon(Icons.content_copy_outlined),
+                  tooltip: 'COPY RAW SIGNAL',
+                  onPressed: () {
+                    final signal = int.tryParse(signalController.text);
+                    if (signal != null && signal < 0) {
+                      Clipboard.setData(
+                        ClipboardData(text: rawInputSignalText(signal)),
+                      );
+                    }
+                  },
+                ),
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: const Text('CANCEL'),

@@ -48,7 +48,10 @@ String conversationLogText(
 ) => entry.signals == null ? entry.text : dictionary.formatSignals(entry.signals!);
 
 String rawConversationLogData(ConversationLogEntry entry) =>
-    'R,${entry.callSign},${entry.sequence},${entry.signals?.join(',') ?? entry.text}';
+  entry.signals
+    ?.map(rawInputSignalText)
+    .join(' ') ??
+  entry.text;
 
 abstract interface class ConversationLogRepository {
   Future<List<ConversationLogEntry>> load();

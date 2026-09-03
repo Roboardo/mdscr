@@ -6,6 +6,10 @@ import 'package:mdscr/settings.dart';
 import 'package:mdscr/signal_dictionary.dart';
 
 void main() {
+  test('formats negative signals for raw input', () {
+    expect(rawInputSignalText(-123), '|-123');
+  });
+
   test('formats saved log signals with the current dictionary', () {
     final entry = ConversationLogEntry(
       receivedAt: DateTime(2026),
@@ -17,7 +21,7 @@ void main() {
     const dictionary = SignalDictionary({-1: 'UPDATED'});
 
     expect(conversationLogText(entry, dictionary), 'UPDATED 42');
-    expect(rawConversationLogData(entry), 'R,8,12,-1,42');
+    expect(rawConversationLogData(entry), '|-1 42');
   });
 
   group('validateWebSocketUrl', () {

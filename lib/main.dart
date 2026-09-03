@@ -107,7 +107,25 @@ String messageTextForClipboard(
     visibleSignalsForRelayMessage(message).join(' ');
 
 String rawMessageDataForClipboard(RelayMessage message) =>
-    'R,${message.callSign},${message.sequence},${message.signals.join(',')}';
+  visibleSignalsForRelayMessage(message)
+  .map(rawInputSignalText)
+  .join(' ');
+
+bool shouldNotifyForMessage(
+  RelayMessage message,
+  int? selectedEncryptionKey,
+) {
+  final encryptionKey = encryptionKeyForRelayMessage(message);
+  return encryptionKey == null ||
+      selectedEncryptionKey == encryptionKey ||
+      selectedEncryptionKey == signalEncryptionSkeleton;
+}
+
+bool isFarAboveMessageListBottom({
+  required double pixels,
+  required double maxScrollExtent,
+  required double viewportDimension,
+}) => maxScrollExtent - pixels > viewportDimension * 3;
 
 TextEditingValue insertTextAtSelection(TextEditingValue value, String text) {
   final selection = value.selection;
@@ -431,7 +449,11 @@ class _ChatScreenState extends State<ChatScreen>
                     encryptionKey != _selectedEncryptionKey) {
                   _unreadMessageKeys.add(encryptionKey);
                 }
-                if (!_isAppInForeground) {
+                if (!_isAppInForeground &&
+                    shouldNotifyForMessage(
+                      relayMessage,
+                      _selectedEncryptionKey,
+                    )) {
                   unawaited(_showIncomingMessageNotification(message));
                 }
               }
@@ -592,6 +614,14 @@ class _ChatScreenState extends State<ChatScreen>
               ),
             ),
             actions: [
+              if (!settings.dictionary.entries.containsKey(signal))
+                IconButton(
+                  icon: const Icon(Icons.content_copy_outlined),
+                  tooltip: 'COPY RAW SIGNAL',
+                  onPressed: () => Clipboard.setData(
+                    ClipboardData(text: rawInputSignalText(signal)),
+                  ),
+                ),
               TextButton(
                 onPressed: () => Navigator.pop(context),
                 child: const Text('CANCEL'),
@@ -996,6 +1026,7 @@ class _MessageListState extends State<_MessageList>
   final Set<String> _expandedMessageIds = {};
   late int _messageCount;
   bool _wasAtBottom = true;
+  bool _showJumpToBottomButton = false;
 
   @override
   void initState() {
@@ -1018,10 +1049,24 @@ class _MessageListState extends State<_MessageList>
 
   void _updateBottomPosition() {
     if (_scrollController.hasClients) {
-      _wasAtBottom = _scrollController.position.pixels >=
-          _scrollController.position.maxScrollExtent - 1;
+      final position = _scrollController.position;
+      _wasAtBottom = position.pixels >= position.maxScrollExtent - 1;
+      final showJumpToBottomButton = isFarAboveMessageListBottom(
+        pixels: position.pixels,
+        maxScrollExtent: position.maxScrollExtent,
+        viewportDimension: position.viewportDimension,
+      );
+      if (showJumpToBottomButton != _showJumpToBottomButton && mounted) {
+        setState(() => _showJumpToBottomButton = showJumpToBottomButton);
+      }
     }
   }
+
+  Future<void> _jumpToBottom() => _scrollController.animateTo(
+    _scrollController.position.maxScrollExtent,
+    duration: const Duration(milliseconds: 250),
+    curve: Curves.easeOut,
+  );
 
   Future<void> _showMessageActions(RelayMessage message) async {
     final selection = await showModalBottomSheet<_MessageCopyAction>(
@@ -1092,11 +1137,13 @@ class _MessageListState extends State<_MessageList>
       return const Center(child: Text('WAITING FOR SIGNALS...'));
     }
 
-    return ListView.builder(
-      controller: _scrollController,
-      padding: const EdgeInsets.symmetric(vertical: 8),
-      itemCount: widget.messages.length,
-      itemBuilder: (context, index) {
+    return Stack(
+      children: [
+        ListView.builder(
+          controller: _scrollController,
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          itemCount: widget.messages.length,
+          itemBuilder: (context, index) {
         final chatMessage = widget.messages[index];
         final message = chatMessage.relayMessage;
         final encryptionKey = encryptionKeyForRelayMessage(message);
@@ -1214,7 +1261,23 @@ class _MessageListState extends State<_MessageList>
             const Divider(height: 1),
           ],
         );
-      },
+          },
+        ),
+        if (_showJumpToBottomButton)
+          Positioned(
+            right: 16,
+            bottom: 16,
+            child: Material(
+              color: Theme.of(context).colorScheme.surface,
+              shape: const CircleBorder(),
+              child: IconButton(
+                tooltip: 'JUMP TO LATEST',
+                onPressed: _jumpToBottom,
+                icon: const Icon(Icons.arrow_downward),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

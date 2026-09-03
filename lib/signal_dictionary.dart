@@ -18,6 +18,9 @@ const signalNegative = -1;
 const signalDecimal = -10;
 const musicSecond = .8066;
 
+String rawInputSignalText(int signal) =>
+  signal < 0 ? '|$signal' : signal.toString();
+
 class GraphicSphere {
   const GraphicSphere({
     required this.x,

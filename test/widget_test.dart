@@ -39,12 +39,53 @@ void main() {
     );
   });
 
+  test('notifies encrypted messages only for the active key or skeleton tab', () {
+    const encryptedMessage = RelayMessage(
+      callSign: 1,
+      sequence: 1,
+      signals: [signalEncryption, 123, -1],
+    );
+    const unencryptedMessage = RelayMessage(
+      callSign: 1,
+      sequence: 2,
+      signals: [-1],
+    );
+
+    expect(shouldNotifyForMessage(encryptedMessage, 123), isTrue);
+    expect(
+      shouldNotifyForMessage(encryptedMessage, signalEncryptionSkeleton),
+      isTrue,
+    );
+    expect(shouldNotifyForMessage(encryptedMessage, 456), isFalse);
+    expect(shouldNotifyForMessage(encryptedMessage, null), isFalse);
+    expect(shouldNotifyForMessage(unencryptedMessage, null), isTrue);
+  });
+
+  test('shows the jump button only when several screens above the latest message', () {
+    expect(
+      isFarAboveMessageListBottom(
+        pixels: 100,
+        maxScrollExtent: 2000,
+        viewportDimension: 600,
+      ),
+      isTrue,
+    );
+    expect(
+      isFarAboveMessageListBottom(
+        pixels: 1400,
+        maxScrollExtent: 2000,
+        viewportDimension: 600,
+      ),
+      isFalse,
+    );
+  });
+
   test('formats message text and raw data for copying', () {
     const message = RelayMessage(callSign: 8, sequence: 12, signals: [-1, 42]);
     const dictionary = SignalDictionary({-1: 'HELLO'});
 
     expect(messageTextForClipboard(message, dictionary), 'HELLO 42');
-    expect(rawMessageDataForClipboard(message), 'R,8,12,-1,42');
+    expect(rawMessageDataForClipboard(message), '|-1 42');
   });
 
   test('replaces the composer token at the cursor', () {
