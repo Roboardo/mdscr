@@ -72,9 +72,11 @@ class _OptionsScreenState extends State<OptionsScreen> {
       return;
     }
 
-    await _persist(_settings.copyWith(
+    final settings = _settings.copyWith(
       webSocketUrl: normalizeWebSocketUrl(value),
-    ));
+    );
+    setState(() => _dictionary = settings.dictionary);
+    await _persist(settings);
   }
 
   Future<void> _resetAddress() async {

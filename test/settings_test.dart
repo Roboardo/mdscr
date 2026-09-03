@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mdscr/conversation_log.dart';
 import 'package:mdscr/settings.dart';
 import 'package:mdscr/signal_dictionary.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   test('formats negative signals for raw input', () {
@@ -82,6 +83,34 @@ void main() {
       expect(validateCallSign('0'), isNotNull);
       expect(validateCallSign('7777'), isNotNull);
       expect(validateCallSign('8'), isNotNull);
+    });
+  });
+
+  group('SharedPreferencesSettingsRepository', () {
+    test('migrates and selects dictionaries for their associated servers',
+        () async {
+      const firstUrl = 'wss://first.example.org';
+      const secondUrl = 'wss://second.example.org';
+      const firstDictionary = SignalDictionary({-1: 'FIRST'});
+      const secondDictionary = SignalDictionary({-2: 'SECOND'});
+      SharedPreferences.setMockInitialValues({
+        'websocket_url': firstUrl,
+        'signal_dictionary': firstDictionary.toJsonString(),
+      });
+      final repository = SharedPreferencesSettingsRepository();
+
+      var settings = await repository.load();
+      expect(settings.dictionary.entries, firstDictionary.entries);
+
+      settings = settings.copyWith(webSocketUrl: secondUrl);
+      expect(settings.dictionary.entries, isEmpty);
+      await repository.save(settings);
+      await repository.save(settings.copyWith(dictionary: secondDictionary));
+
+      settings = await repository.load();
+      expect(settings.dictionary.entries, secondDictionary.entries);
+      settings = settings.copyWith(webSocketUrl: firstUrl);
+      expect(settings.dictionary.entries, firstDictionary.entries);
     });
   });
 

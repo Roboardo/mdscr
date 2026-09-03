@@ -1063,10 +1063,10 @@ class _MessageListState extends State<_MessageList>
 
   Future<void> _jumpToBottom() async {
     await _scrollController.animateTo(
-    _scrollController.position.maxScrollExtent,
-    duration: const Duration(milliseconds: 250),
-    curve: Curves.easeOut,
-  );
+      _scrollController.position.maxScrollExtent,
+      duration: const Duration(milliseconds: 250),
+      curve: Curves.easeOut,
+    );
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
     }

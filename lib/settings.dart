@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'signal_dictionary.dart';
@@ -11,15 +13,21 @@ enum AppTheme { terminalDark, terminalLight }
 class AppSettings {
   const AppSettings({
     required this.webSocketUrl,
-    this.dictionary = const SignalDictionary.empty(),
+    this.dictionaries = const {},
+    SignalDictionary? dictionary,
     this.theme = AppTheme.terminalDark,
     this.preferredCallSign,
     this.backgroundConnectionGraceSeconds = 120,
     this.activeEncryptionKeys = const [],
-  });
+  }) : _legacyDictionary = dictionary;
 
   final String webSocketUrl;
-  final SignalDictionary dictionary;
+  final Map<String, SignalDictionary> dictionaries;
+  final SignalDictionary? _legacyDictionary;
+  SignalDictionary get dictionary =>
+      dictionaries[normalizeWebSocketUrl(webSocketUrl)] ??
+      _legacyDictionary ??
+      const SignalDictionary.empty();
   final AppTheme theme;
   final int? preferredCallSign;
   final int backgroundConnectionGraceSeconds;
@@ -34,9 +42,14 @@ class AppSettings {
     List<int>? activeEncryptionKeys,
     bool clearPreferredCallSign = false,
   }) {
+    final nextWebSocketUrl = normalizeWebSocketUrl(
+      webSocketUrl ?? this.webSocketUrl,
+    );
     return AppSettings(
-      webSocketUrl: webSocketUrl ?? this.webSocketUrl,
-      dictionary: dictionary ?? this.dictionary,
+      webSocketUrl: nextWebSocketUrl,
+      dictionaries: dictionary == null
+          ? dictionaries
+          : {...dictionaries, nextWebSocketUrl: dictionary},
       theme: theme ?? this.theme,
       preferredCallSign: clearPreferredCallSign
           ? null
@@ -56,6 +69,7 @@ abstract interface class SettingsRepository {
 class SharedPreferencesSettingsRepository implements SettingsRepository {
   static const _webSocketUrlKey = 'websocket_url';
   static const _dictionaryKey = 'signal_dictionary';
+  static const _dictionariesKey = 'signal_dictionaries';
   static const _themeKey = 'theme';
   static const _preferredCallSignKey = 'preferred_call_sign';
   static const _backgroundConnectionGraceSecondsKey =
@@ -65,23 +79,25 @@ class SharedPreferencesSettingsRepository implements SettingsRepository {
   @override
   Future<AppSettings> load() async {
     final preferences = await SharedPreferences.getInstance();
+    final webSocketUrl = normalizeWebSocketUrl(
+      preferences.getString(_webSocketUrlKey) ?? defaultWebSocketUrl,
+    );
     final savedDictionary = preferences.getString(_dictionaryKey);
-    SignalDictionary dictionary;
-    try {
-      dictionary = savedDictionary == null
-          ? const SignalDictionary.empty()
-          : SignalDictionary.fromStoredJsonString(savedDictionary);
-    } on FormatException {
-      dictionary = const SignalDictionary.empty();
+    final dictionaries = _readDictionaries(
+      preferences.getString(_dictionariesKey),
+    );
+    if (dictionaries.isEmpty && savedDictionary != null) {
+      final dictionary = _readDictionary(savedDictionary);
+      if (dictionary != null) {
+        dictionaries[webSocketUrl] = dictionary;
+      }
     }
-    if (savedDictionary != null && savedDictionary != dictionary.toJsonString()) {
-      await preferences.setString(_dictionaryKey, dictionary.toJsonString());
+    if (savedDictionary != null || preferences.containsKey(_dictionariesKey)) {
+      await preferences.setString(_dictionariesKey, _encodeDictionaries(dictionaries));
     }
     return AppSettings(
-      webSocketUrl: normalizeWebSocketUrl(
-        preferences.getString(_webSocketUrlKey) ?? defaultWebSocketUrl,
-      ),
-      dictionary: dictionary,
+      webSocketUrl: webSocketUrl,
+      dictionaries: dictionaries,
       theme: switch (preferences.getString(_themeKey)) {
         'terminalLight' => AppTheme.terminalLight,
         _ => AppTheme.terminalDark,
@@ -105,7 +121,9 @@ class SharedPreferencesSettingsRepository implements SettingsRepository {
       normalizeWebSocketUrl(settings.webSocketUrl),
     );
     await preferences.setString(
-        _dictionaryKey, settings.dictionary.toJsonString());
+      _dictionariesKey,
+      _encodeDictionaries(settings.dictionaries),
+    );
     await preferences.setString(_themeKey, settings.theme.name);
     if (settings.preferredCallSign == null) {
       await preferences.remove(_preferredCallSignKey);
@@ -124,6 +142,44 @@ class SharedPreferencesSettingsRepository implements SettingsRepository {
       settings.activeEncryptionKeys.map((key) => key.toString()).toList(),
     );
   }
+
+  Map<String, SignalDictionary> _readDictionaries(String? value) {
+    if (value == null) {
+      return {};
+    }
+    try {
+      final decoded = jsonDecode(value);
+      if (decoded is! Map) {
+        return {};
+      }
+      final dictionaries = <String, SignalDictionary>{};
+      for (final entry in decoded.entries) {
+        if (entry.key is! String || entry.value is! String) {
+          continue;
+        }
+        final dictionary = _readDictionary(entry.value as String);
+        if (dictionary != null) {
+          dictionaries[normalizeWebSocketUrl(entry.key as String)] = dictionary;
+        }
+      }
+      return dictionaries;
+    } on FormatException {
+      return {};
+    }
+  }
+
+  SignalDictionary? _readDictionary(String value) {
+    try {
+      return SignalDictionary.fromStoredJsonString(value);
+    } on FormatException {
+      return null;
+    }
+  }
+
+  String _encodeDictionaries(Map<String, SignalDictionary> dictionaries) => jsonEncode({
+        for (final entry in dictionaries.entries)
+          normalizeWebSocketUrl(entry.key): entry.value.toJsonString(),
+      });
 }
 
 String normalizeWebSocketUrl(String value) {
