@@ -39,7 +39,7 @@ void main() {
     );
   });
 
-  test('notifies encrypted messages only for the active key or skeleton tab', () {
+  test('notifies messages for every active encryption key', () {
     const encryptedMessage = RelayMessage(
       callSign: 1,
       sequence: 1,
@@ -51,14 +51,12 @@ void main() {
       signals: [-1],
     );
 
-    expect(shouldNotifyForMessage(encryptedMessage, 123), isTrue);
     expect(
-      shouldNotifyForMessage(encryptedMessage, signalEncryptionSkeleton),
+      shouldNotifyForMessage(encryptedMessage, {123, 456}),
       isTrue,
     );
-    expect(shouldNotifyForMessage(encryptedMessage, 456), isFalse);
-    expect(shouldNotifyForMessage(encryptedMessage, null), isFalse);
-    expect(shouldNotifyForMessage(unencryptedMessage, null), isTrue);
+    expect(shouldNotifyForMessage(encryptedMessage, {456}), isFalse);
+    expect(shouldNotifyForMessage(unencryptedMessage, {}), isTrue);
   });
 
   test('shows the jump button only when several screens above the latest message', () {

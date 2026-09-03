@@ -113,12 +113,11 @@ String rawMessageDataForClipboard(RelayMessage message) =>
 
 bool shouldNotifyForMessage(
   RelayMessage message,
-  int? selectedEncryptionKey,
+  Set<int> activeEncryptionKeys,
 ) {
   final encryptionKey = encryptionKeyForRelayMessage(message);
   return encryptionKey == null ||
-      selectedEncryptionKey == encryptionKey ||
-      selectedEncryptionKey == signalEncryptionSkeleton;
+      activeEncryptionKeys.contains(encryptionKey);
 }
 
 bool isFarAboveMessageListBottom({
@@ -452,7 +451,7 @@ class _ChatScreenState extends State<ChatScreen>
                 if (!_isAppInForeground &&
                     shouldNotifyForMessage(
                       relayMessage,
-                      _selectedEncryptionKey,
+                      _encryptionKeys,
                     )) {
                   unawaited(_showIncomingMessageNotification(message));
                 }
