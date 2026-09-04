@@ -67,6 +67,10 @@ List<MusicNote>? parseMusicNotes(List<int> signals) {
     return null;
   }
 
+  if (musicSignals.single == signalSong) {
+    return _parseSongNotes(signals, musicStart + 2);
+  }
+
   if (musicStart + 2 < signals.length &&
       _matchingMusicCloseSignal(signals[musicStart + 2]) != null) {
     return _parseStructuredMusic(signals, musicStart + 1);
@@ -111,6 +115,62 @@ List<MusicNote>? parseMusicNotes(List<int> signals) {
       return List.unmodifiable(notes);
     }
     if (signals[current++] != signalSeparator || current >= signals.length) {
+      return null;
+    }
+    if (signals[current] == signalClose) {
+      return List.unmodifiable(notes);
+    }
+  }
+}
+
+List<MusicNote>? _parseSongNotes(List<int> signals, int current) {
+  final notes = <MusicNote>[];
+  var nextDelay = 0.0;
+  while (true) {
+    if (current >= signals.length || signals[current++] != signalNote) {
+      return null;
+    }
+
+    double delay;
+    final ({double value, int nextIndex})? duration;
+    if (current < signals.length && signals[current] == signalSeparator) {
+      current++;
+      delay = nextDelay;
+      duration = _consumeGraphicNumber(signals, current);
+    } else {
+      final parsedDelay = _consumeGraphicNumber(signals, current);
+      if (parsedDelay == null || parsedDelay.value < 0) {
+        return null;
+      }
+      delay = parsedDelay.value;
+      current = parsedDelay.nextIndex;
+      if (current >= signals.length || signals[current++] != signalSeparator) {
+        return null;
+      }
+      duration = _consumeGraphicNumber(signals, current);
+    }
+    if (duration == null || duration.value <= 0) {
+      return null;
+    }
+    current = duration.nextIndex;
+    if (current >= signals.length || signals[current++] != signalSeparator) {
+      return null;
+    }
+    final frequency = _consumeGraphicNumber(signals, current);
+    if (frequency == null || frequency.value <= 0) {
+      return null;
+    }
+    current = frequency.nextIndex;
+    notes.add(
+      MusicNote(
+        delay: delay * musicSecond,
+        duration: duration.value * musicSecond,
+        frequency: frequency.value / musicSecond,
+      ),
+    );
+    nextDelay = delay + duration.value;
+
+    if (current >= signals.length) {
       return null;
     }
     if (signals[current] == signalClose) {
@@ -421,7 +481,11 @@ List<GraphicSphere>? parseGraphicSpheres(List<int> signals) {
     if (current >= signals.length || signals[current] < 0) {
       return null;
     }
-    final value = double.parse('0.${signals[current++]}');
+    final fraction = StringBuffer();
+    while (current < signals.length && signals[current] >= 0) {
+      fraction.write(signals[current++]);
+    }
+    final value = double.parse('0.$fraction');
     return (value: negative ? -value : value, nextIndex: current);
   }
   if (current >= signals.length || signals[current] < 0) {
@@ -434,7 +498,10 @@ List<GraphicSphere>? parseGraphicSpheres(List<int> signals) {
     if (current >= signals.length || signals[current] < 0) {
       return null;
     }
-    final fraction = signals[current++];
+    final fraction = StringBuffer();
+    while (current < signals.length && signals[current] >= 0) {
+      fraction.write(signals[current++]);
+    }
     value = double.parse('$whole.$fraction');
   }
   return (value: negative ? -value : value, nextIndex: current);

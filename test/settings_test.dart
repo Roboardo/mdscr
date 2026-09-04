@@ -171,6 +171,24 @@ void main() {
       expect(notes.map((note) => note.frequency), contains(58.3 / musicSecond));
     });
 
+    test('parses supplied SONG streams with implicit and explicit delays',
+        () {
+      final signals = File('music-sample3')
+          .readAsStringSync()
+          .trim()
+          .split(RegExp(r'\s+'))
+          .map(int.parse)
+          .toList();
+
+      final notes = parseMusicNotes(signals);
+      expect(notes, isNotNull);
+      expect(notes!.length, greaterThan(100));
+      expect(notes.first.delay, 0);
+      expect(notes[1].delay, notes.first.duration);
+      expect(notes.map((note) => note.frequency), contains(597 / musicSecond));
+      expect(notes.last.delay, greaterThan(50 * musicSecond));
+    });
+
     test('parses MFDS graphic sphere payloads', () {
       final spheres = parseGraphicSpheres([
         -53,
