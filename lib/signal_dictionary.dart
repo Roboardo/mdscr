@@ -730,11 +730,7 @@ class SignalDictionary {
     if (breakAfterDouble) {
       return _separatorFor(SignalFormatMode.lineBreak);
     }
-    final joinsDouble =
-      signals[index] == signals[index - 1] && signals[index] < 0;
-    return joinsDouble
-      ? ''
-      : separatorBetween(signals[index - 1], signals[index]);
+    return separatorBetween(signals[index - 1], signals[index]);
   }
 
   String separatorBetween(int firstSignal, int secondSignal) {

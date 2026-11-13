@@ -309,9 +309,9 @@ void main() {
       );
 
       expect(dictionary.formatSignals([-1, -2, -3]), 'A\nB\n\nC');
-      expect(dictionary.formatSignals([-2, -2]), 'BB');
-      expect(dictionary.formatSignals([-2, -2, -1]), 'BB\nA');
-      expect(dictionary.formatSignals([-1, -1]), 'AA');
+      expect(dictionary.formatSignals([-2, -2]), 'B B');
+      expect(dictionary.formatSignals([-2, -2, -1]), 'B B\nA');
+      expect(dictionary.formatSignals([-1, -1]), 'A\nA');
       expect(dictionary.formatSignals([-2, 42]), 'B42');
       expect(dictionary.formatSignals([42, 43]), '42 43');
       final restored = SignalDictionary.fromJsonString(dictionary.toJsonString());
